@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CivicDrive — Smarter roads. Safer journeys.</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, sans-serif; }
+
+  body {
+    min-height: 100vh;
+    background:
+      linear-gradient(rgba(10, 25, 47, 0.88), rgba(20, 40, 80, 0.92)),
+      url('https://images.unsplash.com/photo-1449824913935-59a10b8d2000?auto=format&fit=crop&w=1920&q=80')
+      center/cover no-repeat fixed;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  /* ===== TOAST NOTIFICATIONS ===== */
+  .toast-container {
+    position: fixed; top: 20px; right: 20px; z-index: 99999;
+    display: flex; flex-direction: column; gap: 10px; pointer-events: none;
+  }
+  .toast {
+    padding: 14px 20px; border-radius: 12px; font-size: 13px; font-weight: 500;
+    backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.15);
+    animation: toastIn .4s ease, toastOut .4s ease 3.2s forwards;
+    display: flex; align-items: center; gap: 10px; min-width: 280px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5); pointer-events: auto;
+  }
+  .toast.success { background: rgba(46,125,50,0.85); color: #c8e6c9; }
+  .toast.error   { background: rgba(198,40,40,0.85); color: #ffcdd2; }
+  .toast.info    { background: rgba(25,118,210,0.85); color: #bbdefb; }
+  .toast.warn    { background: rgba(239,108,0,0.85); color: #ffe0b2; }
+  @keyframes toastIn  { from { transform: translateX(120%); opacity:0; } to { transform: none; opacity:1; } }
+  @keyframes toastOut { to   { transform: translateX(120%); opacity:0; } }
+
+  /* ===== AUTH BOX ===== */
+  .auth-wrap {
+    width: 100%; max-width: 420px;
+    background: rgba(255,255,255,0.07); backdrop-filter: blur(14px);
+    border: 1px solid rgba(255,255,255,0.15); border-radius: 18px;
+    padding: 35px 30px; box-shadow: 0 25px 60px rgba(0,0,0,0.4);
+  }
+  .auth-wrap h1 {
+    text-align: center; font-size: 24px; margin-bottom: 4px;
+    background: linear-gradient(90deg,#4fc3f7,#81d4fa,#fff);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .auth-wrap p.sub { text-align: center; font-size: 13px; color: #b3cfff; margin-bottom: 22px; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 18px; }
+  .tab {
+    flex: 1; padding: 10px; text-align: center; cursor: pointer; border-radius: 10px;
+    background: rgba(255,255,255,0.06); transition: .3s; font-size: 14px;
+    border: 1px solid transparent; color: #b3cfff;
+  }
+  .tab.active { background: #1976d2; border-color: #42a5f5; color: #fff; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 12px; color: #cfe3ff; margin-bottom: 6px; font-weight: 600; }
+  .field input, .field select, .field textarea {
+    width: 100%; padding: 11px 13px; border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.18); background: rgba(0,0,0,0.25);
+    color: #fff; font-size: 14px; outline: none; transition: .25s;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    border-color: #42a5f5; box-shadow: 0 0 0 3px rgba(66,165,245,0.25);
+  }
+  .field input::placeholder, .field textarea::placeholder { color: #7a9bc5; }
+  .field.has-error input, .field.has-error select {
+    border-color: #ef5350 !important; box-shadow: 0 0 0 3px rgba(239,83,80,0.2) !important;
+  }
+  .field .err-msg { font-size: 11px; color: #ef5350; margin-top: 4px; display: none; }
+  .field.has-error .err-msg { display: block; }
+
+  .btn {
+    width: 100%; padding: 13px; border: none; border-radius: 10px; cursor: pointer;
+    font-size: 15px; font-weight: 600; color: #fff;
+    background: linear-gradient(90deg,#1976d2,#42a5f5); transition: .25s; margin-top: 6px;
+  }
+  .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(66,165,245,0.4); }
+  .btn:active { transform: scale(0.97); }
+  .btn.danger  { background: linear-gradient(90deg,#c62828,#ef5350); }
+  .btn.danger:hover { box-shadow: 0 8px 20px rgba(239,83,80,0.4); }
+  .btn.success { background: linear-gradient(90deg,#2e7d32,#66bb6a); }
+  .btn.success:hover { box-shadow: 0 8px 20px rgba(102,187,106,0.4); }
+  .btn.warn    { background: linear-gradient(90deg,#ef6c00,#ffa726); color: #1a1a1a; }
+  .btn.warn:hover { box-shadow: 0 8px 20px rgba(255,167,38,0.4); }
+  .btn.ghost   { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); }
+  .btn-sm { width: auto; padding: 7px 14px; font-size: 12px; border-radius: 8px; }
+
+  /* ===== APP DASHBOARD ===== */
+  .app { display: none; width: 100%; max-width: 1100px; }
+  .navbar {
+    display: flex; justify-content: space-between; align-items: center;
+    background: rgba(255,255,255,0.07); backdrop-filter: blur(10px);
+    padding: 14px 22px; border-radius: 14px; margin-bottom: 20px;
+    border: 1px solid rgba(255,255,255,0.12); flex-wrap: wrap; gap: 10px;
+  }
+  .navbar .brand { font-size: 18px; font-weight: 700; color: #81d4fa; white-space: nowrap; }
+  .navbar .right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .navbar .user-chip {
+    background: rgba(66,165,245,0.15); border: 1px solid rgba(66,165,245,0.3);
+    padding: 7px 14px; border-radius: 20px; font-size: 13px; color: #81d4fa; font-weight: 500;
+  }
+  .nav-btn {
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+    color: #b3cfff; padding: 8px 14px; border-radius: 8px; cursor: pointer;
+    font-size: 13px; transition: .2s; font-family: inherit;
+  }
+  .nav-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
+  .nav-btn.active { background: #1976d2; border-color: #42a5f5; color: #fff; }
+
+  .card {
+    background: rgba(255,255,255,0.06); backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 22px; margin-bottom: 18px;
+  }
+  .card h2 {
+    font-size: 17px; color: #4fc3f7; margin-bottom: 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;
+  }
+  .panel { display: none; }
+  .panel.active { display: block; animation: fade .35s ease; }
+  @keyframes fade { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+
+  .stat-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+  .stat {
+    flex: 1; min-width: 120px; background: rgba(0,0,0,0.25); border-radius: 10px;
+    padding: 16px; text-align: center; border: 1px solid rgba(255,255,255,0.06);
+  }
+  .stat .num { font-size: 26px; font-weight: 700; color: #fff; }
+  .stat .lbl { font-size: 11px; color: #9bb4d4; margin-top: 4px; text-transform: uppercase; letter-spacing: .5px; }
+
+  .list-item {
+    background: rgba(0,0,0,0.22); border-radius: 10px; padding: 14px 16px;
+    margin-bottom: 12px; border-left: 4px solid #42a5f5; font-size: 13px;
+    transition: .2s;
+  }
+  .list-item:hover { background: rgba(0,0,0,0.3); }
+  .list-item .top { display: flex; justify-content: space-between; margin-bottom: 8px; align-items: center; }
+  .list-item .top strong { color: #81d4fa; font-family: 'Courier New', monospace; }
+  .badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .badge.pending  { background: rgba(239,108,0,0.25); color: #ffa726; }
+  .badge.review   { background: rgba(25,118,210,0.25); color: #64b5f6; }
+  .badge.approved { background: rgba(46,125,50,0.25); color: #81c784; }
+  .badge.rejected { background: rgba(198,40,40,0.25); color: #ef5350; }
+
+  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; margin-bottom: 8px; }
+  .meta-grid .ml { color: #7a9bc5; }
+  .meta-grid .mv { color: #e0e8f0; }
+
+  .activity-log { max-height: 400px; overflow-y: auto; padding-right: 4px; }
+  .activity-log::-webkit-scrollbar { width: 4px; }
+  .activity-log::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+  .activity-log .entry {
+    border-left: 3px solid #4fc3f7; padding: 10px 14px; margin-bottom: 8px;
+    background: rgba(0,0,0,0.2); border-radius: 6px; font-size: 13px;
+  }
+  .activity-log .time { color: #7a9bc5; font-size: 11px; margin-top: 3px; }
+
+  .cert {
+    background: linear-gradient(135deg,#1b5e20,#2e7d32); border: 2px dashed rgba(165,214,167,0.4);
+    border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 14px;
+    position: relative; overflow: hidden;
+  }
+  .cert::before {
+    content: ''; position: absolute; inset: 8px; border: 1px dashed rgba(165,214,167,0.2);
+    border-radius: 8px; pointer-events: none;
+  }
+  .cert .icon { font-size: 28px; margin-bottom: 6px; }
+  .cert .title { font-size: 17px; font-weight: 700; color: #fff; }
+  .cert .name { font-size: 22px; color: #c8e6c9; margin: 8px 0; font-weight: 700; }
+  .cert .desc { font-size: 12px; color: #e8f5e9; line-height: 1.6; max-width: 480px; margin: 0 auto 10px; }
+  .cert .seal { font-size: 11px; color: #a5d6a7; margin-top: 10px; font-style: italic; }
+
+  .preview-img { max-width: 100%; border-radius: 8px; margin-top: 8px; max-height: 160px; border: 1px solid rgba(255,255,255,0.1); }
+  .empty { color: #7a9bc5; font-size: 13px; text-align: center; padding: 30px 14px; }
+  .empty i { font-size: 32px; display: block; margin-bottom: 10px; opacity: .4; }
+  .desc-text { color: #9bb4d4; font-style: italic; margin-bottom: 8px; font-size: 12px; }
+  .actions-row { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .sub-time { font-size: 11px; color: #5a7a9e; margin-top: 8px; }
+  .cert-badge { color: #81c784; font-size: 12px; margin-top: 8px; }
+  .info-bar {
+    background: rgba(66,165,245,0.1); border: 1px solid rgba(66,165,245,0.2);
+    border-radius: 10px; padding: 10px 14px; margin-bottom: 16px;
+    font-size: 12px; color: #64b5f6; display: flex; align-items: center; gap: 8px;
+  }
+
+  @media (max-width: 780px) {
+    .meta-grid { grid-template-columns: 1fr; }
+    .nav-btn span { display: none; }
+    .navbar .brand span { display: none; }
+  }
+
+  /* ===== CIVICDRIVE MIDNIGHT CIVIC THEME ===== */
+  :root { --cd-bg:#050b16; --cd-panel:#0b1424; --cd-panel2:#101d31; --cd-blue:#4aa3ff; --cd-blue2:#77c4ff; --cd-text:#f4f8ff; --cd-muted:#9bb0ca; --cd-border:rgba(125,170,220,.18); --cd-green:#35d39a; --cd-amber:#ffbd59; --cd-red:#ff6b75; }
+  body { background: radial-gradient(circle at 10% 0%, rgba(37,112,190,.18), transparent 30%), radial-gradient(circle at 90% 20%, rgba(24,71,132,.18), transparent 32%), linear-gradient(135deg,#030812,#071322 55%,#050a14); color:var(--cd-text); align-items:flex-start; overflow-x:hidden; }
+  .auth-wrap { background:rgba(11,20,36,.86); border:1px solid var(--cd-border); box-shadow:0 30px 80px rgba(0,0,0,.55); backdrop-filter:blur(20px); }
+  .auth-wrap h1 { background:linear-gradient(90deg,#fff,var(--cd-blue2),var(--cd-blue)); }
+  .auth-wrap p.sub { color:#9eb8d8; }
+  .tab.active { background:linear-gradient(135deg,#176fc3,#2f8ee8); border-color:#5ab2ff; }
+  .field input,.field select,.field textarea { background:#07111f; border-color:var(--cd-border); }
+  .field input:focus,.field select:focus,.field textarea:focus { border-color:var(--cd-blue); box-shadow:0 0 0 3px rgba(74,163,255,.14); }
+  .btn { background:linear-gradient(135deg,#227ed0,#3ca4ff); box-shadow:0 8px 22px rgba(34,126,208,.18); }
+  .btn.success { background:linear-gradient(135deg,#159b72,#2bcf9b); }
+  .btn.warn { background:linear-gradient(135deg,#c77c16,#f0a42e); }
+  .navbar { background:rgba(5,11,22,.88); border-color:var(--cd-border); box-shadow:0 15px 45px rgba(0,0,0,.25); backdrop-filter:blur(18px); }
+  .navbar .brand { color:#fff; }
+  .navbar .brand > i { color:var(--cd-blue); font-size:20px; }
+  .navbar .brand small { display:block; font-size:8px; font-weight:500; color:#7892af; letter-spacing:.4px; margin-top:2px; }
+  .nav-btn { background:rgba(255,255,255,.035); border-color:var(--cd-border); color:#b5c9df; }
+  .nav-btn:hover { background:rgba(74,163,255,.1); color:#fff; border-color:rgba(74,163,255,.3); }
+  .nav-btn.active { background:rgba(47,142,232,.16); border-color:rgba(74,163,255,.5); color:#fff; box-shadow:0 0 22px rgba(74,163,255,.08); }
+  .panel { max-width:1180px; }
+  .card { background:linear-gradient(145deg,rgba(11,20,36,.94),rgba(8,17,30,.94)); border-color:var(--cd-border); box-shadow:0 18px 50px rgba(0,0,0,.22); }
+  .card h2 { color:#f7fbff; }
+  .card h3 { color:#e8f2ff; margin-bottom:14px; }
+  .card h3 i { color:var(--cd-blue); margin-right:8px; }
+  .stat { background:linear-gradient(145deg,#0d1a2c,#0a1422); border-color:var(--cd-border); }
+  .stat .num { color:var(--cd-blue2); }
+  .stat .lbl,.muted { color:#7890ac; }
+  .info-bar { background:rgba(74,163,255,.08); border-color:rgba(74,163,255,.2); color:#a9c8e9; }
+  .list-item { background:#0a1422; border-color:var(--cd-border); }
+  .list-item:hover { border-color:rgba(74,163,255,.32); transform:translateY(-1px); }
+  .section-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; margin-bottom:20px; }
+  .section-heading h2 { margin:2px 0 5px; }
+  .section-sub { color:#91a8c3; font-size:13px; line-height:1.6; }
+  .eyebrow { display:block; font-size:10px; letter-spacing:1.5px; color:var(--cd-blue); font-weight:800; }
+  .icon-pill { width:44px;height:44px;border-radius:13px;display:grid;place-items:center;background:rgba(74,163,255,.1);border:1px solid rgba(74,163,255,.2);color:var(--cd-blue2); }
+  .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .quick-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:18px; }
+  .quick-card { border:1px solid var(--cd-border); background:linear-gradient(145deg,#0c192b,#091321); border-radius:14px; padding:16px; color:#fff; text-align:left; display:flex; align-items:center; gap:12px; cursor:pointer; transition:.25s; }
+  .quick-card:hover { transform:translateY(-2px); border-color:rgba(74,163,255,.42); background:#0d1d31; }
+  .quick-card > i:first-child { color:var(--cd-blue); font-size:18px; }
+  .quick-card > i:last-child { margin-left:auto; color:#68809b; font-size:12px; }
+  .quick-card span { display:flex; flex-direction:column; gap:4px; }
+  .quick-card strong { font-size:12px; } .quick-card small { color:#7790aa; font-size:10px; line-height:1.4; }
+  .insight-kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+  .insight-kpi { padding:18px; border:1px solid var(--cd-border); border-radius:14px; background:#0a1422; }
+  .insight-kpi .value { font-size:25px; font-weight:800; color:#eaf5ff; } .insight-kpi .label { color:#7d95b0; font-size:11px; margin-top:4px; }
+  .insight-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .bar-row { display:grid; grid-template-columns:130px 1fr 34px; gap:10px; align-items:center; margin:11px 0; font-size:11px; color:#a9bdd4; }
+  .bar { height:8px; background:#142338; border-radius:99px; overflow:hidden; } .bar span { display:block; height:100%; border-radius:99px; background:linear-gradient(90deg,#2f8ee8,#70c0ff); }
+  .hotspot { padding:12px 0; border-bottom:1px solid rgba(125,170,220,.1); display:flex; justify-content:space-between; gap:15px; } .hotspot:last-child { border-bottom:0; } .hotspot strong { font-size:12px; } .hotspot small { display:block;color:#7188a2;margin-top:3px; } .hotspot .count { color:var(--cd-blue2);font-weight:800; }
+  .snapshot { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; } .snapshot-item { padding:14px;border-radius:12px;background:#091523;border:1px solid var(--cd-border); } .snapshot-item strong{display:block;font-size:13px}.snapshot-item span{font-size:11px;color:#8098b2;line-height:1.5;display:block;margin-top:4px;}
+  .ai-shell { min-height:600px; } .ai-status { font-size:11px;color:#8fa8c2;border:1px solid var(--cd-border);padding:7px 10px;border-radius:99px;white-space:nowrap; } .ai-status span{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--cd-green);margin-right:6px;box-shadow:0 0 10px rgba(53,211,154,.7);} .ai-suggestions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:15px}.ai-suggestions button{background:#0b192a;border:1px solid var(--cd-border);color:#a8c2dc;padding:8px 11px;border-radius:99px;cursor:pointer;font-size:11px}.ai-suggestions button:hover{border-color:rgba(74,163,255,.4);color:#fff}.chat-window{height:360px;overflow:auto;padding:14px;border:1px solid var(--cd-border);border-radius:16px;background:#060e19}.chat-msg{display:flex;gap:10px;max-width:82%;margin:10px 0}.chat-msg.user{margin-left:auto;flex-direction:row-reverse}.chat-msg .avatar{width:30px;height:30px;flex:0 0 30px;border-radius:10px;display:grid;place-items:center;background:rgba(74,163,255,.12);color:var(--cd-blue2);font-size:12px}.chat-msg.user .avatar{background:rgba(53,211,154,.1);color:var(--cd-green)}.chat-msg > div:last-child{background:#0b1829;border:1px solid var(--cd-border);padding:10px 12px;border-radius:12px}.chat-msg.user > div:last-child{background:#0b2230}.chat-msg strong{font-size:10px;color:#8fb1d5}.chat-msg p{font-size:12px;line-height:1.55;color:#d4e1ef;margin-top:4px}.chat-form{display:flex;gap:10px;margin-top:12px}.chat-form input{flex:1;background:#07111f;border:1px solid var(--cd-border);border-radius:12px;padding:12px;color:#fff;outline:none}.chat-form .btn{width:50px;padding:0}.ai-note{margin-top:10px;font-size:10px;color:#7189a4;line-height:1.5}.ai-note i{color:var(--cd-blue);margin-right:5px}
+  .hazard-card .badge{font-size:9px}.badge.high,.badge.critical{background:rgba(255,107,117,.12);color:#ff8b93;border-color:rgba(255,107,117,.2)}
+  @media(max-width:900px){.quick-grid,.insight-grid{grid-template-columns:1fr}.insight-kpis{grid-template-columns:1fr 1fr}.snapshot{grid-template-columns:1fr}.two-col{grid-template-columns:1fr}.navbar .right{overflow-x:auto;max-width:100%}}
+  @media(max-width:600px){.insight-kpis{grid-template-columns:1fr}.chat-window{height:330px}.section-heading{gap:10px}.quick-card{padding:13px}.navbar{padding:10px}.navbar .brand small{display:none}}
+
+
+  /* ===== CIVICDRIVE MIDNIGHT CIVIC THEME ===== */
+  :root { --cd-bg:#050b16; --cd-panel:#0b1424; --cd-panel2:#101d31; --cd-blue:#4aa3ff; --cd-blue2:#77c4ff; --cd-text:#f4f8ff; --cd-muted:#9bb0ca; --cd-border:rgba(125,170,220,.18); --cd-green:#35d39a; --cd-amber:#ffbd59; --cd-red:#ff6b75; }
+  body { background: radial-gradient(circle at 10% 0%, rgba(37,112,190,.18), transparent 30%), radial-gradient(circle at 90% 20%, rgba(24,71,132,.18), transparent 32%), linear-gradient(135deg,#030812,#071322 55%,#050a14); color:var(--cd-text); align-items:flex-start; overflow-x:hidden; }
+  .auth-wrap { background:rgba(11,20,36,.86); border:1px solid var(--cd-border); box-shadow:0 30px 80px rgba(0,0,0,.55); backdrop-filter:blur(20px); }
+  .auth-wrap h1 { background:linear-gradient(90deg,#fff,var(--cd-blue2),var(--cd-blue)); }
+  .auth-wrap p.sub { color:#9eb8d8; }
+  .tab.active { background:linear-gradient(135deg,#176fc3,#2f8ee8); border-color:#5ab2ff; }
+  .field input,.field select,.field textarea { background:#07111f; border-color:var(--cd-border); }
+  .field input:focus,.field select:focus,.field textarea:focus { border-color:var(--cd-blue); box-shadow:0 0 0 3px rgba(74,163,255,.14); }
+  .btn { background:linear-gradient(135deg,#227ed0,#3ca4ff); box-shadow:0 8px 22px rgba(34,126,208,.18); }
+  .btn.success { background:linear-gradient(135deg,#159b72,#2bcf9b); }
+  .btn.warn { background:linear-gradient(135deg,#c77c16,#f0a42e); }
+  .navbar { background:rgba(5,11,22,.88); border-color:var(--cd-border); box-shadow:0 15px 45px rgba(0,0,0,.25); backdrop-filter:blur(18px); }
+  .navbar .brand { color:#fff; }
+  .navbar .brand > i { color:var(--cd-blue); font-size:20px; }
+  .navbar .brand small { display:block; font-size:8px; font-weight:500; color:#7892af; letter-spacing:.4px; margin-top:2px; }
+  .nav-btn { background:rgba(255,255,255,.035); border-color:var(--cd-border); color:#b5c9df; }
+  .nav-btn:hover { background:rgba(74,163,255,.1); color:#fff; border-color:rgba(74,163,255,.3); }
+  .nav-btn.active { background:rgba(47,142,232,.16); border-color:rgba(74,163,255,.5); color:#fff; box-shadow:0 0 22px rgba(74,163,255,.08); }
+  .panel { max-width:1180px; }
+  .card { background:linear-gradient(145deg,rgba(11,20,36,.94),rgba(8,17,30,.94)); border-color:var(--cd-border); box-shadow:0 18px 50px rgba(0,0,0,.22); }
+  .card h2 { color:#f7fbff; }
+  .card h3 { color:#e8f2ff; margin-bottom:14px; }
+  .card h3 i { color:var(--cd-blue); margin-right:8px; }
+  .stat { background:linear-gradient(145deg,#0d1a2c,#0a1422); border-color:var(--cd-border); }
+  .stat .num { color:var(--cd-blue2); }
+  .stat .lbl,.muted { color:#7890ac; }
+  .info-bar { background:rgba(74,163,255,.08); border-color:rgba(74,163,255,.2); color:#a9c8e9; }
+  .list-item { background:#0a1422; border-color:var(--cd-border); }
+  .list-item:hover { border-color:rgba(74,163,255,.32); transform:translateY(-1px); }
+  .section-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; margin-bottom:20px; }
+  .section-heading h2 { margin:2px 0 5px; }
+  .section-sub { color:#91a8c3; font-size:13px; line-height:1.6; }
+  .eyebrow { display:block; font-size:10px; letter-spacing:1.5px; color:var(--cd-blue); font-weight:800; }
+  .icon-pill { width:44px;height:44px;border-radius:13px;display:grid;place-items:center;background:rgba(74,163,255,.1);border:1px solid rgba(74,163,255,.2);color:var(--cd-blue2); }
+  .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .quick-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:18px; }
+  .quick-card { border:1px solid var(--cd-border); background:linear-gradient(145deg,#0c192b,#091321); border-radius:14px; padding:16px; color:#fff; text-align:left; display:flex; align-items:center; gap:12px; cursor:pointer; transition:.25s; }
+  .quick-card:hover { transform:translateY(-2px); border-color:rgba(74,163,255,.42); background:#0d1d31; }
+  .quick-card > i:first-child { color:var(--cd-blue); font-size:18px; }
+  .quick-card > i:last-child { margin-left:auto; color:#68809b; font-size:12px; }
+  .quick-card span { display:flex; flex-direction:column; gap:4px; }
+  .quick-card strong { font-size:12px; } .quick-card small { color:#7790aa; font-size:10px; line-height:1.4; }
+  .insight-kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+  .insight-kpi { padding:18px; border:1px solid var(--cd-border); border-radius:14px; background:#0a1422; }
+  .insight-kpi .value { font-size:25px; font-weight:800; color:#eaf5ff; } .insight-kpi .label { color:#7d95b0; font-size:11px; margin-top:4px; }
+  .insight-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .bar-row { display:grid; grid-template-columns:130px 1fr 34px; gap:10px; align-items:center; margin:11px 0; font-size:11px; color:#a9bdd4; }
+  .bar { height:8px; background:#142338; border-radius:99px; overflow:hidden; } .bar span { display:block; height:100%; border-radius:99px; background:linear-gradient(90deg,#2f8ee8,#70c0ff); }
+  .hotspot { padding:12px 0; border-bottom:1px solid rgba(125,170,220,.1); display:flex; justify-content:space-between; gap:15px; } .hotspot:last-child { border-bottom:0; } .hotspot strong { font-size:12px; } .hotspot small { display:block;color:#7188a2;margin-top:3px; } .hotspot .count { color:var(--cd-blue2);font-weight:800; }
+  .snapshot { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; } .snapshot-item { padding:14px;border-radius:12px;background:#091523;border:1px solid var(--cd-border); } .snapshot-item strong{display:block;font-size:13px}.snapshot-item span{font-size:11px;color:#8098b2;line-height:1.5;display:block;margin-top:4px;}
+  .ai-shell { min-height:600px; } .ai-status { font-size:11px;color:#8fa8c2;border:1px solid var(--cd-border);padding:7px 10px;border-radius:99px;white-space:nowrap; } .ai-status span{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--cd-green);margin-right:6px;box-shadow:0 0 10px rgba(53,211,154,.7);} .ai-suggestions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:15px}.ai-suggestions button{background:#0b192a;border:1px solid var(--cd-border);color:#a8c2dc;padding:8px 11px;border-radius:99px;cursor:pointer;font-size:11px}.ai-suggestions button:hover{border-color:rgba(74,163,255,.4);color:#fff}.chat-window{height:360px;overflow:auto;padding:14px;border:1px solid var(--cd-border);border-radius:16px;background:#060e19}.chat-msg{display:flex;gap:10px;max-width:82%;margin:10px 0}.chat-msg.user{margin-left:auto;flex-direction:row-reverse}.chat-msg .avatar{width:30px;height:30px;flex:0 0 30px;border-radius:10px;display:grid;place-items:center;background:rgba(74,163,255,.12);color:var(--cd-blue2);font-size:12px}.chat-msg.user .avatar{background:rgba(53,211,154,.1);color:var(--cd-green)}.chat-msg > div:last-child{background:#0b1829;border:1px solid var(--cd-border);padding:10px 12px;border-radius:12px}.chat-msg.user > div:last-child{background:#0b2230}.chat-msg strong{font-size:10px;color:#8fb1d5}.chat-msg p{font-size:12px;line-height:1.55;color:#d4e1ef;margin-top:4px}.chat-form{display:flex;gap:10px;margin-top:12px}.chat-form input{flex:1;background:#07111f;border:1px solid var(--cd-border);border-radius:12px;padding:12px;color:#fff;outline:none}.chat-form .btn{width:50px;padding:0}.ai-note{margin-top:10px;font-size:10px;color:#7189a4;line-height:1.5}.ai-note i{color:var(--cd-blue);margin-right:5px}
+  .hazard-card .badge{font-size:9px}.badge.high,.badge.critical{background:rgba(255,107,117,.12);color:#ff8b93;border-color:rgba(255,107,117,.2)}
+  @media(max-width:900px){.quick-grid,.insight-grid{grid-template-columns:1fr}.insight-kpis{grid-template-columns:1fr 1fr}.snapshot{grid-template-columns:1fr}.two-col{grid-template-columns:1fr}.navbar .right{overflow-x:auto;max-width:100%}}
+  @media(max-width:600px){.insight-kpis{grid-template-columns:1fr}.chat-window{height:330px}.section-heading{gap:10px}.quick-card{padding:13px}.navbar{padding:10px}.navbar .brand small{display:none}}
+
+</style>
+</head>
+<body>
+
+<div class="toast-container" id="toastBox"></div>
+
+<!-- ============ AUTH SECTION ============ -->
+<div class="auth-wrap" id="authWrap">
+  <h1><i class="fa-solid fa-road"></i> CivicDrive</h1>
+  <p class="sub">Smarter roads. Safer journeys.</p>
+  <div class="tabs">
+    <div class="tab active" id="tabLogin">Login</div>
+    <div class="tab" id="tabRegister">Register</div>
+  </div>
+
+  <form id="loginForm" novalidate>
+    <div class="field" id="lfEmail">
+      <label>Email</label>
+      <input type="email" id="loginEmail" placeholder="you@example.com">
+      <div class="err-msg">Enter a valid email address</div>
+    </div>
+    <div class="field" id="lfPass">
+      <label>Password</label>
+      <input type="password" id="loginPass" placeholder="Enter your password">
+      <div class="err-msg">Password is required</div>
+    </div>
+    <button type="submit" class="btn">Login</button>
+  </form>
+
+  <form id="registerForm" style="display:none;" novalidate>
+    <div class="field" id="rfName">
+      <label>Full Name</label>
+      <input type="text" id="regName" placeholder="John Doe">
+      <div class="err-msg">Name is required</div>
+    </div>
+    <div class="field" id="rfEmail">
+      <label>Email</label>
+      <input type="email" id="regEmail" placeholder="you@example.com">
+      <div class="err-msg">Valid email is required</div>
+    </div>
+    <div class="field" id="rfPhone">
+      <label>Phone</label>
+      <input type="text" id="regPhone" placeholder="+91XXXXXXXXXX">
+      <div class="err-msg">Phone number is required</div>
+    </div>
+    <div class="field" id="rfPass">
+      <label>Password</label>
+      <input type="password" id="regPass" placeholder="Minimum 6 characters">
+      <div class="err-msg">Minimum 6 characters required</div>
+    </div>
+    <button type="submit" class="btn warn">Create Account</button>
+  </form>
+</div>
+
+<!-- ============ APP DASHBOARD ============ -->
+<div class="app" id="app">
+  <nav class="navbar">
+    <div class="brand"><i class="fa-solid fa-road"></i><span>CivicDrive <small>Smarter roads. Safer journeys.</small></span></div>
+    <div class="right">
+      <span class="user-chip" id="userChip"></span>
+      <button class="nav-btn active" data-p="dashboard"><i class="fa-solid fa-gauge"></i> <span>Dashboard</span></button>
+      <button class="nav-btn" data-p="report"><i class="fa-solid fa-plus"></i> <span>New Report</span></button>
+      <button class="nav-btn" data-p="track"><i class="fa-solid fa-list-check"></i> <span>My Reports</span></button>
+      <button class="nav-btn" data-p="hazard"><i class="fa-solid fa-triangle-exclamation"></i> <span>Road Hazards</span></button>
+      <button class="nav-btn" data-p="insights"><i class="fa-solid fa-chart-line"></i> <span>Safety Insights</span></button>
+      <button class="nav-btn" data-p="ai"><i class="fa-solid fa-robot"></i> <span>CivicDrive AI</span></button>
+      <button class="nav-btn" data-p="cert"><i class="fa-solid fa-award"></i> <span>Certificates</span></button>
+      <button class="nav-btn" data-p="activity"><i class="fa-solid fa-clock-rotate-left"></i> <span>Activity</span></button>
+      <button class="nav-btn" id="logoutBtn" style="background:#c62828;border-color:#ef5350;"><i class="fa-solid fa-right-from-bracket"></i></button>
+    </div>
+  </nav>
+
+  <!-- DASHBOARD -->
+  <section class="panel active" id="panel-dashboard">
+    <div class="card">
+      <h2>Welcome Dashboard</h2>
+      <p style="font-size:14px;color:#cfe3ff;margin-bottom:16px;">
+        Hello <strong id="helloName" style="color:#63b3ff;"></strong>! Report unsafe driving, track verified cases, flag road hazards, explore safety insights, or ask CivicDrive AI for guidance.
+      </p>
+      <div class="stat-row">
+        <div class="stat"><div class="num" id="stTotal">0</div><div class="lbl">Total Reports</div></div>
+        <div class="stat"><div class="num" id="stPending">0</div><div class="lbl">Pending / Review</div></div>
+        <div class="stat"><div class="num" id="stApproved">0</div><div class="lbl">Approved</div></div>
+        <div class="stat"><div class="num" id="stCerts">0</div><div class="lbl">Certificates</div></div>
+      </div>
+      <div class="quick-grid">
+        <button class="quick-card" data-go="hazard"><i class="fa-solid fa-triangle-exclamation"></i><span><strong>Report a Road Hazard</strong><small>Potholes, blocked roads, signal issues & more</small></span><i class="fa-solid fa-arrow-right"></i></button>
+        <button class="quick-card" data-go="insights"><i class="fa-solid fa-chart-line"></i><span><strong>Safety Intelligence</strong><small>Understand local trends and hotspots</small></span><i class="fa-solid fa-arrow-right"></i></button>
+        <button class="quick-card" data-go="ai"><i class="fa-solid fa-robot"></i><span><strong>Ask CivicDrive AI</strong><small>Traffic rules, reports and safety guidance</small></span><i class="fa-solid fa-arrow-right"></i></button>
+      </div>
+      <div class="quick-grid">
+        <button class="quick-card" data-go="hazard"><i class="fa-solid fa-triangle-exclamation"></i><span><strong>Report a Road Hazard</strong><small>Potholes, blocked roads, signal issues & more</small></span><i class="fa-solid fa-arrow-right"></i></button>
+        <button class="quick-card" data-go="insights"><i class="fa-solid fa-chart-line"></i><span><strong>Safety Intelligence</strong><small>Understand local trends and hotspots</small></span><i class="fa-solid fa-arrow-right"></i></button>
+        <button class="quick-card" data-go="ai"><i class="fa-solid fa-robot"></i><span><strong>Ask CivicDrive AI</strong><small>Traffic rules, reports and safety guidance</small></span><i class="fa-solid fa-arrow-right"></i></button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Recent Activity</h2>
+      <div id="dashActivity"></div>
+    </div>
+  </section>
+
+  <!-- NEW REPORT -->
+  <section class="panel" id="panel-report">
+    <div class="card">
+      <h2>Report a Traffic Violation</h2>
+      <div class="info-bar"><i class="fa-solid fa-flask"></i> Reports auto-progress: Pending &rarr; Review &rarr; Approved/Rejected</div>
+      <form id="reportForm" novalidate>
+        <div class="field" id="rfType">
+          <label>Violation Type</label>
+          <select id="rType">
+            <option value="">-- Select type --</option>
+            <option>Over Speeding</option><option>Red Light Jump</option><option>No Helmet</option>
+            <option>Wrong Side Driving</option><option>Drunken Driving</option><option>Illegal Parking</option>
+            <option>Using Mobile While Driving</option><option>No Seat Belt</option><option>Triple Riding</option>
+            <option>Others</option>
+          </select>
+          <div class="err-msg">Select a violation type</div>
+        </div>
+        <div class="field" id="rfVehicle">
+          <label>Vehicle Number</label>
+          <input type="text" id="rVehicle" placeholder="e.g., MH12 AB 1234">
+          <div class="err-msg">Vehicle number is required</div>
+        </div>
+        <div class="field" id="rfLocation">
+          <label>Location</label>
+          <input type="text" id="rLocation" placeholder="Street / Area / City">
+          <div class="err-msg">Location is required</div>
+        </div>
+        <div class="field" id="rfDateTime">
+          <label>Date & Time of Violation</label>
+          <input type="datetime-local" id="rDateTime">
+          <div class="err-msg">Date and time are required</div>
+        </div>
+        <div class="field">
+          <label>Upload Photo Evidence</label>
+          <input type="file" id="rPhoto" accept="image/*">
+          <img id="photoPreview" class="preview-img" style="display:none;">
+        </div>
+        <div class="field">
+          <label>Additional Description</label>
+          <textarea id="rDesc" rows="3" placeholder="Describe what you observed..."></textarea>
+        </div>
+        <button type="submit" class="btn success">Submit Report</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- TRACK REPORTS -->
+  <section class="panel" id="panel-track">
+    <div class="card">
+      <h2>My Reports <span id="reportCount" style="font-size:12px;color:#7a9bc5;font-weight:400;margin-left:8px;"></span></h2>
+      <div id="reportsList"></div>
+    </div>
+  </section>
+
+  <!-- ROAD HAZARD REPORTING -->
+  <section class="panel" id="panel-hazard">
+    <div class="card">
+      <div class="section-heading"><div><span class="eyebrow">COMMUNITY SAFETY</span><h2>Report a Road Hazard</h2><p class="section-sub">Help identify potholes, damaged signals and other road issues.</p></div><span class="icon-pill"><i class="fa-solid fa-triangle-exclamation"></i></span></div>
+      <form id="hazardForm" novalidate>
+        <div class="two-col">
+          <div class="field" id="hfType"><label>Hazard Type</label><select id="hType"><option value="">-- Select hazard --</option><option>Pothole / Damaged Road</option><option>Broken Traffic Signal</option><option>Road Blockage</option><option>Waterlogging</option><option>Missing Road Sign</option><option>Streetlight Issue</option><option>Debris / Obstruction</option><option>Other</option></select><div class="err-msg">Select a hazard type</div></div>
+          <div class="field" id="hfSeverity"><label>Severity</label><select id="hSeverity"><option>Low</option><option selected>Medium</option><option>High</option><option>Critical</option></select></div>
+        </div>
+        <div class="field" id="hfLocation"><label>Location</label><input id="hLocation" type="text" placeholder="Street / Area / City"><div class="err-msg">Location is required</div></div>
+        <div class="field"><label>Photo Evidence <span class="muted">(optional)</span></label><input id="hPhoto" type="file" accept="image/*"><img id="hazardPreview" class="preview-img" style="display:none;"></div>
+        <div class="field"><label>Description</label><textarea id="hDesc" rows="3" placeholder="Describe the hazard and how it affects road users..."></textarea></div>
+        <button class="btn primary" type="submit"><i class="fa-solid fa-paper-plane"></i> Submit Hazard Report</button>
+      </form>
+    </div>
+    <div class="card"><div class="section-heading"><div><span class="eyebrow">TRACKING</span><h2>My Hazard Reports</h2></div></div><div id="hazardList"></div></div>
+  </section>
+
+  <!-- SAFETY INTELLIGENCE -->
+  <section class="panel" id="panel-insights">
+    <div class="card">
+      <div class="section-heading"><div><span class="eyebrow">CIVIC INTELLIGENCE</span><h2>Safety Insights</h2><p class="section-sub">A clear view of reported issues and community safety trends.</p></div><span class="icon-pill"><i class="fa-solid fa-chart-line"></i></span></div>
+      <div class="insight-kpis" id="insightKpis"></div>
+    </div>
+    <div class="insight-grid">
+      <div class="card"><h3><i class="fa-solid fa-ranking-star"></i> Violation Trends</h3><div id="violationBars"></div></div>
+      <div class="card"><h3><i class="fa-solid fa-location-dot"></i> Community Hotspots</h3><div id="hotspotList"></div></div>
+    </div>
+    <div class="card"><h3><i class="fa-solid fa-shield-halved"></i> Safety Snapshot</h3><div id="safetySnapshot"></div></div>
+  </section>
+
+  <!-- CIVICDRIVE AI -->
+  <section class="panel" id="panel-ai">
+    <div class="card ai-shell">
+      <div class="section-heading"><div><span class="eyebrow">CIVIC ASSISTANT</span><h2>CivicDrive AI</h2><p class="section-sub">Ask about traffic rules, reports, road safety and how to use CivicDrive.</p></div><span class="ai-status"><span></span> Online</span></div>
+      <div class="ai-suggestions"><button data-q="How do I report a traffic violation?">Report a violation</button><button data-q="What should I do after receiving a challan?">Challan help</button><button data-q="How do I report a pothole?">Road hazard</button><button data-q="What does my report status mean?">Report status</button></div>
+      <div class="chat-window" id="chatWindow"><div class="chat-msg bot"><div class="avatar"><i class="fa-solid fa-robot"></i></div><div><strong>CivicDrive AI</strong><p>Hello! I can help you navigate CivicDrive, understand common traffic-safety topics, and explain your report status.</p></div></div></div>
+      <form id="chatForm" class="chat-form"><input id="chatInput" autocomplete="off" placeholder="Ask CivicDrive AI..."><button class="btn primary" type="submit"><i class="fa-solid fa-paper-plane"></i></button></form>
+      <div class="ai-note"><i class="fa-solid fa-circle-info"></i> This prototype uses a CivicDrive knowledge assistant. A server-side OpenAI/Gemini connection can be added later without exposing an API key in the browser.</div>
+    </div>
+  </section>
+
+  <!-- ROAD HAZARD REPORTING -->
+  <section class="panel" id="panel-hazard">
+    <div class="card">
+      <div class="section-heading"><div><span class="eyebrow">COMMUNITY SAFETY</span><h2>Report a Road Hazard</h2><p class="section-sub">Help identify potholes, damaged signals and other road issues.</p></div><span class="icon-pill"><i class="fa-solid fa-triangle-exclamation"></i></span></div>
+      <form id="hazardForm" novalidate>
+        <div class="two-col">
+          <div class="field" id="hfType"><label>Hazard Type</label><select id="hType"><option value="">-- Select hazard --</option><option>Pothole / Damaged Road</option><option>Broken Traffic Signal</option><option>Road Blockage</option><option>Waterlogging</option><option>Missing Road Sign</option><option>Streetlight Issue</option><option>Debris / Obstruction</option><option>Other</option></select><div class="err-msg">Select a hazard type</div></div>
+          <div class="field" id="hfSeverity"><label>Severity</label><select id="hSeverity"><option>Low</option><option selected>Medium</option><option>High</option><option>Critical</option></select></div>
+        </div>
+        <div class="field" id="hfLocation"><label>Location</label><input id="hLocation" type="text" placeholder="Street / Area / City"><div class="err-msg">Location is required</div></div>
+        <div class="field"><label>Photo Evidence <span class="muted">(optional)</span></label><input id="hPhoto" type="file" accept="image/*"><img id="hazardPreview" class="preview-img" style="display:none;"></div>
+        <div class="field"><label>Description</label><textarea id="hDesc" rows="3" placeholder="Describe the hazard and how it affects road users..."></textarea></div>
+        <button class="btn primary" type="submit"><i class="fa-solid fa-paper-plane"></i> Submit Hazard Report</button>
+      </form>
+    </div>
+    <div class="card"><div class="section-heading"><div><span class="eyebrow">TRACKING</span><h2>My Hazard Reports</h2></div></div><div id="hazardList"></div></div>
+  </section>
+
+  <!-- SAFETY INTELLIGENCE -->
+  <section class="panel" id="panel-insights">
+    <div class="card">
+      <div class="section-heading"><div><span class="eyebrow">CIVIC INTELLIGENCE</span><h2>Safety Insights</h2><p class="section-sub">A clear view of reported issues and community safety trends.</p></div><span class="icon-pill"><i class="fa-solid fa-chart-line"></i></span></div>
+      <div class="insight-kpis" id="insightKpis"></div>
+    </div>
+    <div class="insight-grid">
+      <div class="card"><h3><i class="fa-solid fa-ranking-star"></i> Violation Trends</h3><div id="violationBars"></div></div>
+      <div class="card"><h3><i class="fa-solid fa-location-dot"></i> Community Hotspots</h3><div id="hotspotList"></div></div>
+    </div>
+    <div class="card"><h3><i class="fa-solid fa-shield-halved"></i> Safety Snapshot</h3><div id="safetySnapshot"></div></div>
+  </section>
+
+  <!-- CIVICDRIVE AI -->
+  <section class="panel" id="panel-ai">
+    <div class="card ai-shell">
+      <div class="section-heading"><div><span class="eyebrow">CIVIC ASSISTANT</span><h2>CivicDrive AI</h2><p class="section-sub">Ask about traffic rules, reports, road safety and how to use CivicDrive.</p></div><span class="ai-status"><span></span> Online</span></div>
+      <div class="ai-suggestions"><button data-q="How do I report a traffic violation?">Report a violation</button><button data-q="What should I do after receiving a challan?">Challan help</button><button data-q="How do I report a pothole?">Road hazard</button><button data-q="What does my report status mean?">Report status</button></div>
+      <div class="chat-window" id="chatWindow"><div class="chat-msg bot"><div class="avatar"><i class="fa-solid fa-robot"></i></div><div><strong>CivicDrive AI</strong><p>Hello! I can help you navigate CivicDrive, understand common traffic-safety topics, and explain your report status.</p></div></div></div>
+      <form id="chatForm" class="chat-form"><input id="chatInput" autocomplete="off" placeholder="Ask CivicDrive AI..."><button class="btn primary" type="submit"><i class="fa-solid fa-paper-plane"></i></button></form>
+      <div class="ai-note"><i class="fa-solid fa-circle-info"></i> This prototype uses a CivicDrive knowledge assistant. A server-side OpenAI/Gemini connection can be added later without exposing an API key in the browser.</div>
+    </div>
+  </section>
+
+  <!-- CERTIFICATES -->
+  <section class="panel" id="panel-cert">
+    <div class="card">
+      <h2>Reward Certificates</h2>
+      <p style="font-size:13px;color:#cfe3ff;margin-bottom:14px;">
+        Earn a "Road Safety Volunteer Certificate" for every approved report. Top contributors may receive signed certificates from local authorities.
+      </p>
+      <div id="certList"></div>
+    </div>
+  </section>
+
+  <!-- ACTIVITY -->
+  <section class="panel" id="panel-activity">
+    <div class="card">
+      <h2>Your Activity Log</h2>
+      <p style="font-size:13px;color:#cfe3ff;margin-bottom:14px;">
+        Every action you perform (login, register, report submission, status updates, logout) is recorded below.
+      </p>
+      <div class="activity-log" id="activityLog"></div>
+    </div>
+  </section>
+</div>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<script>
+/* ==========================================================
+   SAFE STORAGE HELPERS
+   ========================================================== */
+function readArr(key) {
+  try { return JSON.parse(localStorage.getItem(key)) || []; }
+  catch(e) { return []; }
+}
+function readObj(key) {
+  try { return JSON.parse(localStorage.getItem(key)) || null; }
+  catch(e) { return null; }
+}
+function write(key, val) {
+  try { localStorage.setItem(key, JSON.stringify(val)); }
+  catch(e) { toast("Storage full. Try without a photo.", "error"); }
+}
+
+const USERS_KEY    = 'tvr_users';
+const SESSION_KEY  = 'tvr_session';
+const REPORTS_KEY  = 'tvr_reports';
+const ACTIVITY_KEY = 'tvr_activities';
+
+/* ==========================================================
+   TOAST NOTIFICATIONS
+   ========================================================== */
+function toast(msg, type) {
+  type = type || 'info';
+  var icons = { success:'fa-circle-check', error:'fa-circle-xmark', info:'fa-circle-info', warn:'fa-triangle-exclamation' };
+  var box = document.getElementById('toastBox');
+  var el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.innerHTML = '<i class="fa-solid ' + (icons[type]||icons.info) + '"></i> ' + msg;
+  box.appendChild(el);
+  setTimeout(function(){ if(el.parentNode) el.parentNode.removeChild(el); }, 3800);
+}
+
+/* ==========================================================
+   ACTIVITY LOGGING
+   ========================================================== */
+function logActivity(email, action) {
+  var acts = readArr(ACTIVITY_KEY);
+  acts.push({ email: email, action: action, time: Date.now() });
+  write(ACTIVITY_KEY, acts);
+}
+
+function formatTime(ts) {
+  try { return new Date(ts).toLocaleString('en-US', { month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit' }); }
+  catch(e) { return ''; }
+}
+
+/* ==========================================================
+   FIELD VALIDATION HELPERS
+   ========================================================== */
+function setError(id, show) {
+  var el = document.getElementById(id);
+  if (el) { if (show) el.classList.add('has-error'); else el.classList.remove('has-error'); }
+}
+function clearErrors(ids) { for (var i = 0; i < ids.length; i++) setError(ids[i], false); }
+function isValidEmail(e) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
+
+/* ==========================================================
+   TAB SWITCHING
+   ========================================================== */
+document.getElementById('tabLogin').addEventListener('click', function() { switchTab('login'); });
+document.getElementById('tabRegister').addEventListener('click', function() { switchTab('register'); });
+
+function switchTab(which) {
+  document.getElementById('tabLogin').classList.toggle('active', which === 'login');
+  document.getElementById('tabRegister').classList.toggle('active', which === 'register');
+  document.getElementById('loginForm').style.display = which === 'login' ? 'block' : 'none';
+  document.getElementById('registerForm').style.display = which === 'register' ? 'block' : 'none';
+  clearErrors(['lfEmail','lfPass','rfName','rfEmail','rfPhone','rfPass']);
+}
+
+/* ==========================================================
+   REGISTER
+   ========================================================== */
+document.getElementById('registerForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  doRegister();
+});
+
+function doRegister() {
+  clearErrors(['rfName','rfEmail','rfPhone','rfPass']);
+  var name  = document.getElementById('regName').value.trim();
+  var email = document.getElementById('regEmail').value.trim().toLowerCase();
+  var phone = document.getElementById('regPhone').value.trim();
+  var pass  = document.getElementById('regPass').value;
+  var ok = true;
+
+  if (!name)               { setError('rfName', true);  ok = false; }
+  if (!email || !isValidEmail(email)) { setError('rfEmail', true); ok = false; }
+  if (!phone)              { setError('rfPhone', true); ok = false; }
+  if (!pass || pass.length < 6)      { setError('rfPass', true);  ok = false; }
+
+  if (!ok) { toast('Please fix the highlighted fields', 'error'); return; }
+
+  var users = readArr(USERS_KEY);
+  for (var i = 0; i < users.length; i++) {
+    if (users[i].email === email) { setError('rfEmail', true); toast('Email already registered', 'error'); return; }
+  }
+
+  users.push({ name: name, email: email, phone: phone, password: pass, joined: Date.now() });
+  write(USERS_KEY, users);
+  logActivity(email, 'Registered a new account');
+  toast('Account created! Please sign in.', 'success');
+  document.getElementById('registerForm').reset();
+  setTimeout(function() { switchTab('login'); }, 700);
+}
+
+/* ==========================================================
+   LOGIN
+   ========================================================== */
+document.getElementById('loginForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  doLogin();
+});
+
+function doLogin() {
+  clearErrors(['lfEmail','lfPass']);
+  var email = document.getElementById('loginEmail').value.trim().toLowerCase();
+  var pass  = document.getElementById('loginPass').value;
+  var ok = true;
+
+  if (!email || !isValidEmail(email)) { setError('lfEmail', true); ok = false; }
+  if (!pass) { setError('lfPass', true); ok = false; }
+
+  if (!ok) { toast('Please fill in all fields correctly', 'error'); return; }
+
+  var users = readArr(USERS_KEY);
+  var found = null;
+  for (var i = 0; i < users.length; i++) {
+    if (users[i].email === email && users[i].password === pass) { found = users[i]; break; }
+  }
+
+  if (!found) { setError('lfEmail', true); setError('lfPass', true); toast('Invalid email or password', 'error'); return; }
+
+  write(SESSION_KEY, { email: found.email, name: found.name, loginTime: Date.now() });
+  logActivity(found.email, 'Signed in successfully');
+  toast('Welcome back, ' + found.name + '!', 'success');
+  setTimeout(enterApp, 350);
+}
+
+/* ==========================================================
+   LOGOUT
+   ========================================================== */
+document.getElementById('logoutBtn').addEventListener('click', function() { doLogout(); });
+
+function doLogout() {
+  var sess = readObj(SESSION_KEY);
+  if (sess) logActivity(sess.email, 'Signed out');
+  localStorage.removeItem(SESSION_KEY);
+  stopSimulation();
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('authWrap').style.display = 'block';
+  document.getElementById('loginForm').reset();
+  toast('Signed out', 'info');
+}
+
+/* ==========================================================
+   ENTER APP
+   ========================================================== */
+function enterApp() {
+  var sess = readObj(SESSION_KEY);
+  if (!sess) return;
+  document.getElementById('authWrap').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('userChip').innerHTML = '<i class="fa-solid fa-user" style="margin-right:4px;"></i> ' + sess.name;
+  document.getElementById('helloName').textContent = sess.name;
+  showPanel('dashboard', document.querySelector('[data-p="dashboard"]'));
+  startSimulation();
+}
+
+/* ==========================================================
+   PANEL SWITCHING
+   ========================================================== */
+var navBtns = document.querySelectorAll('.nav-btn[data-p]');
+for (var i = 0; i < navBtns.length; i++) {
+  (function(btn) {
+    btn.addEventListener('click', function() { showPanel(btn.getAttribute('data-p'), btn); });
+  })(navBtns[i]);
+}
+
+function showPanel(name, btn) {
+  var panels = document.querySelectorAll('.panel');
+  for (var i = 0; i < panels.length; i++) panels[i].classList.remove('active');
+  document.getElementById('panel-' + name).classList.add('active');
+
+  var btns = document.querySelectorAll('.nav-btn[data-p]');
+  for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
+  if (btn) btn.classList.add('active');
+
+  if (name === 'dashboard') refreshDashboard();
+  if (name === 'track')     loadReports();
+  if (name === 'cert')      loadCertificates();
+  if (name === 'activity')  loadActivity();
+}
+
+/* ==========================================================
+   PHOTO HANDLING
+   ========================================================== */
+var currentPhoto = null;
+document.getElementById('rPhoto').addEventListener('change', function() {
+  var file = document.getElementById('rPhoto').files[0];
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) { toast('Image too large (max 2MB)', 'warn'); document.getElementById('rPhoto').value = ''; return; }
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    currentPhoto = e.target.result;
+    var img = document.getElementById('photoPreview');
+    img.src = e.target.result;
+    img.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+});
+
+function clearPhoto() {
+  currentPhoto = null;
+  document.getElementById('rPhoto').value = '';
+  document.getElementById('photoPreview').style.display = 'none';
+}
+
+/* ==========================================================
+   SET DEFAULT DATETIME TO NOW
+   ========================================================== */
+function setDefaultDateTime() {
+  var el = document.getElementById('rDateTime');
+  if (!el) return;
+  var n = new Date();
+  n.setMinutes(n.getMinutes() - n.getTimezoneOffset());
+  el.value = n.toISOString().slice(0, 16);
+}
+
+/* ==========================================================
+   SUBMIT REPORT
+   ========================================================== */
+document.getElementById('reportForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  submitReport();
+});
+
+function submitReport() {
+  clearErrors(['rfType','rfVehicle','rfLocation','rfDateTime']);
+  var sess = readObj(SESSION_KEY);
+  if (!sess) { toast('Session expired. Please log in again.', 'error'); doLogout(); return; }
+
+  var type     = document.getElementById('rType').value;
+  var vehicle  = document.getElementById('rVehicle').value.trim();
+  var location = document.getElementById('rLocation').value.trim();
+  var dt       = document.getElementById('rDateTime').value;
+  var desc     = document.getElementById('rDesc').value.trim();
+  var ok = true;
+
+  if (!type)               { setError('rfType', true);     ok = false; }
+  if (!vehicle)            { setError('rfVehicle', true);  ok = false; }
+  if (!location)           { setError('rfLocation', true); ok = false; }
+  if (!dt)                 { setError('rfDateTime', true); ok = false; }
+
+  if (!ok) { toast('Please fill in all required fields', 'error'); return; }
+
+  var reports = readArr(REPORTS_KEY);
+  var now = Date.now();
+  var newReport = {
+    id: 'RPT-' + now.toString(36).toUpperCase(),
+    email: sess.email,
+    userName: sess.name,
+    type: type,
+    vehicle: vehicle.toUpperCase(),
+    location: location,
+    dateTime: dt,
+    description: desc,
+    photo: currentPhoto,
+    status: 'pending',
+    submittedAt: now,
+    simReviewAt: now + 8000,
+    simDecideAt: now + 20000
+  };
+  reports.push(newReport);
+  write(REPORTS_KEY, reports);
+
+  logActivity(sess.email, 'Submitted report ' + newReport.id + ' (' + type + ')');
+  toast('Report ' + newReport.id + ' submitted!', 'success');
+
+  document.getElementById('reportForm').reset();
+  clearPhoto();
+  setDefaultDateTime();
+
+  setTimeout(function() {
+    showPanel('track', document.querySelector('[data-p="track"]'));
+  }, 800);
+}
+
+/* ==========================================================
+   LOAD REPORTS
+   ========================================================== */
+function loadReports() {
+  var sess = readObj(SESSION_KEY);
+  if (!sess) return;
+  var all = readArr(REPORTS_KEY);
+  var mine = [];
+  for (var i = all.length - 1; i >= 0; i--) { if (all[i].email === sess.email) mine.push(all[i]); }
+
+  document.getElementById('reportCount').textContent = mine.length + ' report' + (mine.length !== 1 ? 's' : '');
+  var list = document.getElementById('reportsList');
+
+  if (mine.length === 0) {
+    list.innerHTML = '<div class="empty"><i class="fa-solid fa-folder-open"></i>No reports yet. Submit your first violation report!</div>';
+    return;
+  }
+
+  var html = '';
+  for (var i = 0; i < mine.length; i++) {
+    var r = mine[i];
+    var cls = r.status === 'pending' ? 'pending' : r.status === 'review' ? 'review' : r.status === 'approved' ? 'approved' : 'rejected';
+    var dtStr = r.dateTime ? new Date(r.dateTime).toLocaleString() : 'N/A';
+    var subStr = formatTime(r.submittedAt);
+
+    var actions = '';
+    if (r.status === 'pending') {
+      actions = '<button class="btn warn btn-sm" data-rid="' + r.id + '" data-st="review"><i class="fa-solid fa-magnifying-glass"></i> Mark Under Review</button>';
+    } else if (r.status === 'review') {
+      actions = '<button class="btn success btn-sm" data-rid="' + r.id + '" data-st="approved"><i class="fa-solid fa-check"></i> Approve</button>';
+      actions += '<button class="btn danger btn-sm" data-rid="' + r.id + '" data-st="rejected"><i class="fa-solid fa-xmark"></i> Reject</button>';
+    }
+
+    var photoHtml = r.photo ? '<img src="' + r.photo + '" class="preview-img" alt="Evidence">' : '';
+    var certNote = r.status === 'approved' ? '<div class="cert-badge"><i class="fa-solid fa-award"></i> Certificate earned for this report!</div>' : '';
+    var descHtml = r.description ? '<div class="desc-text">"' + r.description + '"</div>' : '';
+
+    html += '<div class="list-item">' +
+      '<div class="top"><strong>' + r.id + '</strong><span class="badge ' + cls + '">' + r.status.toUpperCase() + '</span></div>' +
+      '<div class="meta-grid">' +
+        '<div><span class="ml">Type: </span><span class="mv">' + r.type + '</span></div>' +
+        '<div><span class="ml">Vehicle: </span><span class="mv" style="font-family:monospace;">' + r.vehicle + '</span></div>' +
+        '<div><span class="ml">Location: </span><span class="mv">' + r.location + '</span></div>' +
+        '<div><span class="ml">When: </span><span class="mv">' + dtStr + '</span></div>' +
+      '</div>' +
+      descHtml + photoHtml +
+      '<div class="actions-row">' + actions + '</div>' +
+      '<div class="sub-time">Submitted: ' + subStr + '</div>' +
+      certNote +
+    '</div>';
+  }
+  list.innerHTML = html;
+
+  /* Attach event listeners to action buttons */
+  var actBtns = list.querySelectorAll('[data-rid]');
+  for (var j = 0; j < actBtns.length; j++) {
+    (function(btn) {
+      btn.addEventListener('click', function() {
+        updateStatus(btn.getAttribute('data-rid'), btn.getAttribute('data-st'));
+      });
+    })(actBtns[j]);
+  }
+}
+
+/* ==========================================================
+   UPDATE STATUS
+   ========================================================== */
+function updateStatus(id, newStatus) {
+  var sess = readObj(SESSION_KEY);
+  if (!sess) return;
+  var reports = readArr(REPORTS_KEY);
+  var idx = -1;
+  for (var i = 0; i < reports.length; i++) { if (reports[i].id === id) { idx = i; break; } }
+  if (idx === -1) return;
+
+  var oldStatus = reports[idx].status;
+  reports[idx].status = newStatus;
+
+  /* Clear auto-sim timers if manually changed */
+  if (newStatus === 'review')   reports[idx].simReviewAt = 0;
+  if (newStatus === 'approved' || newStatus === 'rejected') {
+    reports[idx].simReviewAt = 0;
+    reports[idx].simDecideAt = 0;
+  }
+
+  write(REPORTS_KEY, reports);
+  logActivity(sess.email, 'Changed ' + id + ': ' + oldStatus.toUpperCase() + ' → ' + newStatus.toUpperCase());
+  toast(id + ' marked as ' + newStatus.toUpperCase(), newStatus === 'approved' ? 'success' : newStatus === 'rejected' ? 'error' : 'info');
+
+  loadReports();
+  refreshDashboard();
+  if (newStatus === 'approved') loadCertificates();
+}
+
+/* ==========================================================
+   AUTO-SIMULATION (Backend mimic: auto-progresses statuses)
+   ========================================================== */
+var simInterval = null;
+function startSimulation() {
+  if (simInterval) clearInterval(simInterval);
+  simInterval = setInterval(function() {
+    var reports = readArr(REPORTS_KEY);
+    var now = Date.now();
+    var changed = false;
+
+    for (var i = 0; i < reports.length; i++) {
+      var r = reports[i];
+      /* Pending → Review */
+      if (r.status === 'pending' && r.simReviewAt && now >= r.simReviewAt) {
+        r.status = 'review';
+        r.simReviewAt = 0;
+        changed = true;
+        logActivity(r.email, r.id + ' moved to REVIEW (auto)');
+        toast(r.id + ' is now under review', 'info');
+      }
+      /* Review → Approved/Rejected */
+      if (r.status === 'review' && r.simDecideAt && now >= r.simDecideAt) {
+        r.status = Math.random() < 0.8 ? 'approved' : 'rejected';
+        r.simDecideAt = 0;
+        changed = true;
+        logActivity(r.email, r.id + ' ' + r.status.toUpperCase() + ' (auto)');
+        toast(r.id + ' has been ' + r.status.toUpperCase(), r.status === 'approved' ? 'success' : 'error');
+      }
+    }
+
+    if (changed) {
+      write(REPORTS_KEY, reports);
+      /* Refresh the currently visible panel */
+      var activePanel = document.querySelector('.panel.active');
+      if (activePanel) {
+        var pid = activePanel.id;
+        if (pid === 'panel-track')     loadReports();
+        if (pid === 'panel-cert')      loadCertificates();
+        if (pid === 'panel-dashboard') refreshDashboard();
+        if (pid === 'panel-activity')  loadActivity();
+      }
+    }
+  }, 2000);
+}
+
+function stopSimulation() {
+  if (simInterval) { clearInterval(simInterval); simInterval = null; }
+}
+
+/* ==========================================================
+   DASHBOARD STATS
+   ========================================================== */
+function refreshDashboard() {
+  var sess = readObj(SESSION_KEY);
+  if (!sess) return;
+  var all = readArr(REPORTS_KEY);
+  var total = 0, pending = 0, approved = 0;
+  for (var i = 0; i < all.length; i++) {
+    if (all[i].email === sess.email) {
+      total++;
+      if (all[i].status === 'pending' || all[i].status === 'review') pending++;
+      if (all[i].status === 'approved') approved++;
+    }
+  }
+  animateNum('stTotal', total);
+  animateNum('stPending', pending);
+  animateNum('stApproved', approved);
+  animateNum('stCerts', approved);
+
+  /* Recent activity on dashboard */
+  var acts = readArr(ACTIVITY_KEY);
+  var myActs = [];
+  for (var i = acts.length - 1; i >= 0; i--) { if (acts[i].email === sess.email) myActs.push(acts[i]); }
+  myActs = myActs.slice(0, 5);
+
+  var box = document.getElementById('dashActivity');
+  if (myActs.length === 0) {
+    box.innerHTML = '<div class="empty" style="padding:14px;">No recent activity</div>';
+    return;
+  }
+  var h = '';
+  for (var i = 0; i < myActs.length; i++) {
+    h += '<div class="entry"><div>' + myActs[i].action + '</div><div class="time">' + formatTime(myActs[i].time) + '</div></div>';
+  }
+  box.innerHTML = h;
+  if (document.getElementById('insightKpis')) refreshInsights();
+}
+
+function animateNum(elId, target) {
+  var el = document.getElementById(elId);
+  var cur = parseInt(el.textContent) || 0;
+  if (cur === target) return;
+  var step = target > cur ? 1 : -1;
+  var iv = setInterval(function() {
+    cur += step;
+    el.textContent = cur;
+    if (cur === target) clearInterval(iv);
+  }, 50);
+}
+
+/* ==========================================================
+   CERTIFICATES
+   ========================================================== */
+function loadCertificates() {
+  var sess = readObj(SESSION_KEY);
+  if (!sess) return;
+  var all = readArr(REPORTS_KEY);
+  var approved = [];
+  for (var i = 0; i < all.length; i++) {
+    if (all[i].email === sess.email && all[i].status === 'approved') approved.push(all[i]);
+  }
+
+  var list = document.getElementById('certList');
+  if (approved.length === 0) {
+    list.innerHTML = '<div class="empty"><i class="fa-solid fa-award"></i>No certificates yet. Get a report approved to earn your first certificate!</div>';
+    return;
+  }
+
+  var html = '';
+  for (var i = 0; i < approved.length; i++) {
+    var r = approved[i];
+    var certNo = 'RSV-' + (1000 + i);
+    var dateStr = new Date(r.submittedAt).toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
+    html += '<div class="cert">' +
+      '<div class="icon"><i class="fa-solid fa-shield-halved"></i></div>' +
+      '<div class="title">Road Safety Volunteer Certificate</div>' +
+      '<div class="name">' + sess.name + '</div>' +
+      '<div class="desc">This certifies that <strong>' + sess.name + '</strong> reported a verified traffic violation (Report ' + r.id + ' — ' + r.type + ', Vehicle ' + r.vehicle + ') contributing to safer roads.</div>' +
+      '<div class="seal">Cert. No: ' + certNo + ' &middot; Issued: ' + dateStr + ' &middot; Traffic Control Authority</div>' +
+    '</div>';
+  }
+  list.innerHTML = html;
+}
+
+/* ==========================================================
+   ACTIVITY LOG
+   ========================================================== */
+function loadActivity() {
+  var sess = readObj(SESSION_KEY);
+  if (!sess) return;
+  var acts = readArr(ACTIVITY_KEY);
+  var myActs = [];
+  for (var i = acts.length - 1; i >= 0; i--) { if (acts[i].email === sess.email) myActs.push(acts[i]); }
+
+  var box = document.getElementById('activityLog');
+  if (myActs.length === 0) {
+    box.innerHTML = '<div class="empty"><i class="fa-solid fa-clock-rotate-left"></i>No activity yet.</div>';
+    return;
+  }
+
+  var html = '';
+  for (var i = 0; i < myActs.length; i++) {
+    html += '<div class="entry"><div>' + myActs[i].action + '</div><div class="time">' + formatTime(myActs[i].time) + '</div></div>';
+  }
+  box.innerHTML = html;
+}
+
+
+/* ==========================================================
+   CIVICDRIVE — ROAD HAZARDS
+   ========================================================== */
+const HAZARDS_KEY = 'civicdrive_hazards';
+function escapeHtml(v) { return String(v == null ? '' : v).replace(/[&<>\"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]; }); }
+function loadHazards() {
+  var sess=readObj(SESSION_KEY); if(!sess) return;
+  var all=readArr(HAZARDS_KEY), mine=all.filter(function(h){return h.email===sess.email;});
+  var box=document.getElementById('hazardList'); if(!mine.length){box.innerHTML='<div class="empty"><i class="fa-solid fa-road"></i>No road hazards reported yet.</div>';return;}
+  box.innerHTML=mine.slice().reverse().map(function(h){
+    return '<div class="list-item hazard-card"><div class="top"><strong>'+escapeHtml(h.id)+'</strong><span class="badge '+escapeHtml(h.severity.toLowerCase())+'">'+escapeHtml(h.status.toUpperCase())+'</span></div><div class="meta-grid"><div><span class="ml">Type: </span><span class="mv">'+escapeHtml(h.type)+'</span></div><div><span class="ml">Severity: </span><span class="mv">'+escapeHtml(h.severity)+'</span></div><div><span class="ml">Location: </span><span class="mv">'+escapeHtml(h.location)+'</span></div><div><span class="ml">Reported: </span><span class="mv">'+formatTime(h.createdAt)+'</span></div></div>'+(h.description?'<div class="desc-text">"'+escapeHtml(h.description)+'"</div>':'')+(h.photo?'<img src="'+h.photo+'" class="preview-img" alt="Hazard evidence">':'')+'<div class="sub-time">Status: '+escapeHtml(h.statusLabel)+'</div></div>';
+  }).join('');
+}
+
+document.addEventListener('change',function(e){
+  if(e.target.id==='hPhoto' && e.target.files && e.target.files[0]){var f=e.target.files[0];if(f.size>3*1024*1024){toast('Hazard photo must be under 3 MB','error');e.target.value='';return;}var r=new FileReader();r.onload=function(){document.getElementById('hazardPreview').src=r.result;document.getElementById('hazardPreview').style.display='block';};r.readAsDataURL(f);}
+});
+
+document.addEventListener('submit',function(e){
+  if(e.target.id!=='hazardForm') return; e.preventDefault();
+  var sess=readObj(SESSION_KEY); if(!sess)return;
+  var type=document.getElementById('hType').value, loc=document.getElementById('hLocation').value.trim();
+  setError('hfType',!type); setError('hfLocation',!loc); if(!type||!loc){toast('Please complete the required hazard details','error');return;}
+  var photoFile=document.getElementById('hPhoto').files[0];
+  function save(photo){var hazards=readArr(HAZARDS_KEY);var id='HZ-'+(10000+hazards.length+1);hazards.push({id:id,email:sess.email,type:type,severity:document.getElementById('hSeverity').value,location:loc,description:document.getElementById('hDesc').value.trim(),photo:photo||'',status:'reported',statusLabel:'Submitted for civic review',createdAt:Date.now()});write(HAZARDS_KEY,hazards);logActivity(sess.email,'Submitted road hazard '+id+' ('+type+')');e.target.reset();document.getElementById('hazardPreview').style.display='none';toast('Hazard '+id+' submitted successfully','success');loadHazards();refreshInsights();}
+  if(photoFile){var fr=new FileReader();fr.onload=function(){save(fr.result);};fr.readAsDataURL(photoFile);}else save('');
+});
+
+/* ==========================================================
+   CIVICDRIVE — SAFETY INTELLIGENCE
+   ========================================================== */
+function refreshInsights(){
+  var reports=readArr(REPORTS_KEY), hazards=readArr(HAZARDS_KEY), sess=readObj(SESSION_KEY);
+  var relevantReports=sess?reports.filter(function(r){return r.email===sess.email;}):reports;
+  var relevantHazards=sess?hazards.filter(function(h){return h.email===sess.email;}):hazards;
+  var approved=relevantReports.filter(function(r){return r.status==='approved';}).length;
+  var pending=relevantReports.filter(function(r){return r.status==='pending'||r.status==='review';}).length;
+  var critical=relevantHazards.filter(function(h){return h.severity==='Critical'||h.severity==='High';}).length;
+  document.getElementById('insightKpis').innerHTML=[['Reports',relevantReports.length,'Traffic violation reports'],['Verified',approved,'Approved reports'],['Hazards',relevantHazards.length,'Road-safety issues'],['Priority Issues',critical,'High / critical hazards']].map(function(x){return '<div class="insight-kpi"><div class="value">'+x[1]+'</div><div class="label">'+x[0]+' · '+x[2]+'</div></div>';}).join('');
+  var counts={}; relevantReports.forEach(function(r){counts[r.type]=(counts[r.type]||0)+1;}); var entries=Object.keys(counts).sort(function(a,b){return counts[b]-counts[a];}).slice(0,7); var max=entries.length?counts[entries[0]]:1;
+  document.getElementById('violationBars').innerHTML=entries.length?entries.map(function(k){return '<div class="bar-row"><span>'+escapeHtml(k)+'</span><div class="bar"><span style="width:'+(counts[k]/max*100)+'%"></span></div><strong>'+counts[k]+'</strong></div>';}).join(''):'<div class="empty">No violation data yet.</div>';
+  var loc={}; relevantReports.concat(relevantHazards.map(function(h){return {location:h.location};})).forEach(function(x){var k=x.location||'Unknown';loc[k]=(loc[k]||0)+1;}); var ls=Object.keys(loc).sort(function(a,b){return loc[b]-loc[a];}).slice(0,5);
+  document.getElementById('hotspotList').innerHTML=ls.length?ls.map(function(k,i){return '<div class="hotspot"><div><strong>'+escapeHtml(k)+'</strong><small>Community-reported activity</small></div><span class="count">'+loc[k]+'</span></div>';}).join(''):'<div class="empty">Submit reports to build local hotspots.</div>';
+  var safetyText=relevantReports.length+relevantHazards.length===0?'Start by submitting a traffic violation or road hazard.':pending>0?'You have reports awaiting review. Keep checking their status.':critical>0?'You have high-priority road hazards in your submissions.':'Your current submissions have no high-priority hazard flags.';
+  document.getElementById('safetySnapshot').innerHTML='<div class="snapshot"><div class="snapshot-item"><strong>Community participation</strong><span>'+relevantReports.length+' violation reports and '+relevantHazards.length+' hazard reports recorded for this account.</span></div><div class="snapshot-item"><strong>Verification</strong><span>'+approved+' report'+(approved===1?' is':'s are')+' currently approved.</span></div><div class="snapshot-item"><strong>Next step</strong><span>'+escapeHtml(safetyText)+'</span></div></div>';
+}
+
+/* ==========================================================
+   CIVICDRIVE AI — LOCAL KNOWLEDGE ASSISTANT / API READY
+   ========================================================== */
+function aiAnswer(q){
+  var s=q.toLowerCase(),sess=readObj(SESSION_KEY);
+  var reports=sess?readArr(REPORTS_KEY).filter(function(r){return r.email===sess.email;}):[];
+  if(/hello|hi|hey/.test(s)) return 'Hello! I am CivicDrive AI. Ask me about reporting violations, road hazards, challans, report statuses, or road-safety guidance.';
+  if(/report.*violation|violation.*report/.test(s)) return 'Open “New Report”, choose the violation type, enter the vehicle number and location, add the incident time, and upload evidence if available. Review your details before submitting.';
+  if(/pothole|hazard|road issue|broken signal/.test(s)) return 'Use “Road Hazards” to report potholes, broken signals, waterlogging, road blockages, missing signs, streetlight issues, or other hazards. Add the location and a photo when possible.';
+  if(/challan|fine|penalty/.test(s)) return 'For a challan, verify the vehicle number, violation details, amount and due date shown by the relevant official system. CivicDrive can explain the information, but payment should be completed only through an authorised government payment channel.';
+  if(/status|pending|review|approved|rejected/.test(s)) { if(!reports.length) return 'You do not have any violation reports saved in this account yet. Submit one from “New Report” to start tracking it.'; var latest=reports[reports.length-1]; return 'Your latest report '+latest.id+' is currently '+latest.status.toUpperCase()+'. Pending means it is awaiting review, Review means it is being checked, Approved means it was verified, and Rejected means it was not accepted.'; }
+  if(/helmet|seat belt|red light|speed|mobile|parking|traffic rule/.test(s)) return 'Traffic rules vary by jurisdiction and can change. I can explain the general safety principle, but for the legally current rule or fine amount, check the applicable official transport or traffic authority source.';
+  if(/certificate/.test(s)) return 'Approved violation reports can appear in Certificates. The certificate recognises a verified community road-safety contribution in this prototype.';
+  if(/thank|thanks/.test(s)) return 'You’re welcome. Stay safe on the road!';
+  return 'I can help with CivicDrive navigation, traffic-violation reports, road-hazard reporting, challan guidance, certificates, and report statuses. Try asking “How do I report a pothole?”';
+}
+function addChat(text,who){var box=document.getElementById('chatWindow'),row=document.createElement('div');row.className='chat-msg '+who;row.innerHTML='<div class="avatar"><i class="fa-solid '+(who==='bot'?'fa-robot':'fa-user')+'"></i></div><div><strong>'+(who==='bot'?'CivicDrive AI':'You')+'</strong><p>'+escapeHtml(text)+'</p></div>';box.appendChild(row);box.scrollTop=box.scrollHeight;}
+
+document.addEventListener('click',function(e){
+  var q=e.target.closest && e.target.closest('[data-q]'); if(q){document.getElementById('chatInput').value=q.getAttribute('data-q');document.getElementById('chatForm').dispatchEvent(new Event('submit',{cancelable:true,bubbles:true}));}
+  var go=e.target.closest && e.target.closest('[data-go]'); if(go){var n=go.getAttribute('data-go'),btn=document.querySelector('[data-p="'+n+'"]');if(btn)btn.click();}
+});
+document.addEventListener('submit',function(e){if(e.target.id!=='chatForm')return;e.preventDefault();var input=document.getElementById('chatInput'),q=input.value.trim();if(!q)return;addChat(q,'user');input.value='';setTimeout(function(){addChat(aiAnswer(q),'bot');},280);});
+
+/* Hook new panels into existing navigation refreshes */
+var _showPanel = showPanel;
+showPanel = function(name,btn){_showPanel(name,btn);if(name==='hazard')loadHazards();if(name==='insights')refreshInsights();};
+
+\n/* ==========================================================\n   CIVICDRIVE — ROAD HAZARDS\n   ========================================================== */\nconst HAZARDS_KEY = 'civicdrive_hazards';\nfunction escapeHtml(v) { return String(v == null ? '' : v).replace(/[&<>\"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]; }); }\nfunction loadHazards() {\n  var sess=readObj(SESSION_KEY); if(!sess) return;\n  var all=readArr(HAZARDS_KEY), mine=all.filter(function(h){return h.email===sess.email;});\n  var box=document.getElementById('hazardList'); if(!mine.length){box.innerHTML='<div class="empty"><i class="fa-solid fa-road"></i>No road hazards reported yet.</div>';return;}\n  box.innerHTML=mine.slice().reverse().map(function(h){\n    return '<div class="list-item hazard-card"><div class="top"><strong>'+escapeHtml(h.id)+'</strong><span class="badge '+escapeHtml(h.severity.toLowerCase())+'">'+escapeHtml(h.status.toUpperCase())+'</span></div><div class="meta-grid"><div><span class="ml">Type: </span><span class="mv">'+escapeHtml(h.type)+'</span></div><div><span class="ml">Severity: </span><span class="mv">'+escapeHtml(h.severity)+'</span></div><div><span class="ml">Location: </span><span class="mv">'+escapeHtml(h.location)+'</span></div><div><span class="ml">Reported: </span><span class="mv">'+formatTime(h.createdAt)+'</span></div></div>'+(h.description?'<div class="desc-text">"'+escapeHtml(h.description)+'"</div>':'')+(h.photo?'<img src="'+h.photo+'" class="preview-img" alt="Hazard evidence">':'')+'<div class="sub-time">Status: '+escapeHtml(h.statusLabel)+'</div></div>';\n  }).join('');\n}\n\ndocument.addEventListener('change',function(e){\n  if(e.target.id==='hPhoto' && e.target.files && e.target.files[0]){var f=e.target.files[0];if(f.size>3*1024*1024){toast('Hazard photo must be under 3 MB','error');e.target.value='';return;}var r=new FileReader();r.onload=function(){document.getElementById('hazardPreview').src=r.result;document.getElementById('hazardPreview').style.display='block';};r.readAsDataURL(f);}\n});\n\ndocument.addEventListener('submit',function(e){\n  if(e.target.id!=='hazardForm') return; e.preventDefault();\n  var sess=readObj(SESSION_KEY); if(!sess)return;\n  var type=document.getElementById('hType').value, loc=document.getElementById('hLocation').value.trim();\n  setError('hfType',!type); setError('hfLocation',!loc); if(!type||!loc){toast('Please complete the required hazard details','error');return;}\n  var photoFile=document.getElementById('hPhoto').files[0];\n  function save(photo){var hazards=readArr(HAZARDS_KEY);var id='HZ-'+(10000+hazards.length+1);hazards.push({id:id,email:sess.email,type:type,severity:document.getElementById('hSeverity').value,location:loc,description:document.getElementById('hDesc').value.trim(),photo:photo||'',status:'reported',statusLabel:'Submitted for civic review',createdAt:Date.now()});write(HAZARDS_KEY,hazards);logActivity(sess.email,'Submitted road hazard '+id+' ('+type+')');e.target.reset();document.getElementById('hazardPreview').style.display='none';toast('Hazard '+id+' submitted successfully','success');loadHazards();refreshInsights();}\n  if(photoFile){var fr=new FileReader();fr.onload=function(){save(fr.result);};fr.readAsDataURL(photoFile);}else save('');\n});\n\n/* ==========================================================\n   CIVICDRIVE — SAFETY INTELLIGENCE\n   ========================================================== */\nfunction refreshInsights(){\n  var reports=readArr(REPORTS_KEY), hazards=readArr(HAZARDS_KEY), sess=readObj(SESSION_KEY);\n  var relevantReports=sess?reports.filter(function(r){return r.email===sess.email;}):reports;\n  var relevantHazards=sess?hazards.filter(function(h){return h.email===sess.email;}):hazards;\n  var approved=relevantReports.filter(function(r){return r.status==='approved';}).length;\n  var pending=relevantReports.filter(function(r){return r.status==='pending'||r.status==='review';}).length;\n  var critical=relevantHazards.filter(function(h){return h.severity==='Critical'||h.severity==='High';}).length;\n  document.getElementById('insightKpis').innerHTML=[['Reports',relevantReports.length,'Traffic violation reports'],['Verified',approved,'Approved reports'],['Hazards',relevantHazards.length,'Road-safety issues'],['Priority Issues',critical,'High / critical hazards']].map(function(x){return '<div class="insight-kpi"><div class="value">'+x[1]+'</div><div class="label">'+x[0]+' · '+x[2]+'</div></div>';}).join('');\n  var counts={}; relevantReports.forEach(function(r){counts[r.type]=(counts[r.type]||0)+1;}); var entries=Object.keys(counts).sort(function(a,b){return counts[b]-counts[a];}).slice(0,7); var max=entries.length?counts[entries[0]]:1;\n  document.getElementById('violationBars').innerHTML=entries.length?entries.map(function(k){return '<div class="bar-row"><span>'+escapeHtml(k)+'</span><div class="bar"><span style="width:'+(counts[k]/max*100)+'%"></span></div><strong>'+counts[k]+'</strong></div>';}).join(''):'<div class="empty">No violation data yet.</div>';\n  var loc={}; relevantReports.concat(relevantHazards.map(function(h){return {location:h.location};})).forEach(function(x){var k=x.location||'Unknown';loc[k]=(loc[k]||0)+1;}); var ls=Object.keys(loc).sort(function(a,b){return loc[b]-loc[a];}).slice(0,5);\n  document.getElementById('hotspotList').innerHTML=ls.length?ls.map(function(k,i){return '<div class="hotspot"><div><strong>'+escapeHtml(k)+'</strong><small>Community-reported activity</small></div><span class="count">'+loc[k]+'</span></div>';}).join(''):'<div class="empty">Submit reports to build local hotspots.</div>';\n  var safetyText=relevantReports.length+relevantHazards.length===0?'Start by submitting a traffic violation or road hazard.':pending>0?'You have reports awaiting review. Keep checking their status.':critical>0?'You have high-priority road hazards in your submissions.':'Your current submissions have no high-priority hazard flags.';\n  document.getElementById('safetySnapshot').innerHTML='<div class="snapshot"><div class="snapshot-item"><strong>Community participation</strong><span>'+relevantReports.length+' violation reports and '+relevantHazards.length+' hazard reports recorded for this account.</span></div><div class="snapshot-item"><strong>Verification</strong><span>'+approved+' report'+(approved===1?' is':'s are')+' currently approved.</span></div><div class="snapshot-item"><strong>Next step</strong><span>'+escapeHtml(safetyText)+'</span></div></div>';\n}\n\n/* ==========================================================\n   CIVICDRIVE AI — LOCAL KNOWLEDGE ASSISTANT / API READY\n   ========================================================== */\nfunction aiAnswer(q){\n  var s=q.toLowerCase(),sess=readObj(SESSION_KEY);\n  var reports=sess?readArr(REPORTS_KEY).filter(function(r){return r.email===sess.email;}):[];\n  if(/hello|hi|hey/.test(s)) return 'Hello! I am CivicDrive AI. Ask me about reporting violations, road hazards, challans, report statuses, or road-safety guidance.';\n  if(/report.*violation|violation.*report/.test(s)) return 'Open “New Report”, choose the violation type, enter the vehicle number and location, add the incident time, and upload evidence if available. Review your details before submitting.';\n  if(/pothole|hazard|road issue|broken signal/.test(s)) return 'Use “Road Hazards” to report potholes, broken signals, waterlogging, road blockages, missing signs, streetlight issues, or other hazards. Add the location and a photo when possible.';\n  if(/challan|fine|penalty/.test(s)) return 'For a challan, verify the vehicle number, violation details, amount and due date shown by the relevant official system. CivicDrive can explain the information, but payment should be completed only through an authorised government payment channel.';\n  if(/status|pending|review|approved|rejected/.test(s)) { if(!reports.length) return 'You do not have any violation reports saved in this account yet. Submit one from “New Report” to start tracking it.'; var latest=reports[reports.length-1]; return 'Your latest report '+latest.id+' is currently '+latest.status.toUpperCase()+'. Pending means it is awaiting review, Review means it is being checked, Approved means it was verified, and Rejected means it was not accepted.'; }\n  if(/helmet|seat belt|red light|speed|mobile|parking|traffic rule/.test(s)) return 'Traffic rules vary by jurisdiction and can change. I can explain the general safety principle, but for the legally current rule or fine amount, check the applicable official transport or traffic authority source.';\n  if(/certificate/.test(s)) return 'Approved violation reports can appear in Certificates. The certificate recognises a verified community road-safety contribution in this prototype.';\n  if(/thank|thanks/.test(s)) return 'You’re welcome. Stay safe on the road!';\n  return 'I can help with CivicDrive navigation, traffic-violation reports, road-hazard reporting, challan guidance, certificates, and report statuses. Try asking “How do I report a pothole?”';\n}\nfunction addChat(text,who){var box=document.getElementById('chatWindow'),row=document.createElement('div');row.className='chat-msg '+who;row.innerHTML='<div class="avatar"><i class="fa-solid '+(who==='bot'?'fa-robot':'fa-user')+'"></i></div><div><strong>'+(who==='bot'?'CivicDrive AI':'You')+'</strong><p>'+escapeHtml(text)+'</p></div>';box.appendChild(row);box.scrollTop=box.scrollHeight;}\n\ndocument.addEventListener('click',function(e){\n  var q=e.target.closest && e.target.closest('[data-q]'); if(q){document.getElementById('chatInput').value=q.getAttribute('data-q');document.getElementById('chatForm').dispatchEvent(new Event('submit',{cancelable:true,bubbles:true}));}\n  var go=e.target.closest && e.target.closest('[data-go]'); if(go){var n=go.getAttribute('data-go'),btn=document.querySelector('[data-p="'+n+'"]');if(btn)btn.click();}\n});\ndocument.addEventListener('submit',function(e){if(e.target.id!=='chatForm')return;e.preventDefault();var input=document.getElementById('chatInput'),q=input.value.trim();if(!q)return;addChat(q,'user');input.value='';setTimeout(function(){addChat(aiAnswer(q),'bot');},280);});\n\n/* Hook new panels into existing navigation refreshes */\nvar _showPanel = showPanel;\nshowPanel = function(name,btn){_showPanel(name,btn);if(name==='hazard')loadHazards();if(name==='insights')refreshInsights();};\n
+/* ==========================================================
+   INITIALIZATION
+   ========================================================== */
+document.addEventListener('DOMContentLoaded', function() {
+  setDefaultDateTime();
+
+  /* Auto-restore session if already logged in */
+  var sess = readObj(SESSION_KEY);
+  if (sess) { enterApp(); loadHazards(); refreshInsights(); }
+});
+</script>
+</body>
+</html>
